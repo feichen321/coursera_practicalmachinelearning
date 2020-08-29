@@ -1,0 +1,71 @@
+---
+title: "How_well_they_excercise"
+author: "Fei Chen"
+date: "2/24/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+It is important to quantify how well they do excercise. In this analysis, the dataset in Velloso et al. (2013) is used. In the dataset, 6 participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions:
+
+- Class A: exactly according to the specification
+- Class B: throwing the elbows to the front
+- Class C: lifting the dumbbell only halfway
+- Class D: lowering the dumbbell only halfway
+- Class E: throwing the hips to the front
+
+In these 5 classes, class A corresponds to the specified execution of the exercise. The other 4 classes correspond to common mistakes. 
+
+## Objective
+The objective of this analysis is to predict the manner in which they did the exercise. 
+
+
+##Data description
+
+Training and testing datasets are downloaded from the course website. Read these files.
+```{r}
+setwd("/Users/feichen/Documents/Coursera/MachineLearning/")
+training <- read.csv("pml-training.csv", stringsAsFactors = F)
+testing <- read.csv("pml-testing.csv", stringsAsFactors = F)
+dim(training)
+```
+
+The training set has 19622 observations and 160 variables. 
+
+A simple way to build a model is use random forest algorithm. There are many NAs in the dataset. Remove the columns that have NAs. The first column "X" is row index. We remove it as well.
+
+```{r}
+training2 <- training[,!colSums(is.na(training))>0]
+training2 <- training2[,-1]
+```
+
+
+```{r}
+library(caret)
+modfit <- train(classe ~ ., data = training2, method = "rf")
+```
+
+
+```{r}
+length(unique(training$num_window))
+```
+
+
+
+This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases.
+
+##Peer Review Portion
+Your submission for the Peer Review portion should consist of a link to a Github repo with your R markdown and compiled HTML file describing your analysis. Please constrain the text of the writeup to < 2000 words and the number of figures to be less than 5. It will make it easier for the graders if you submit a repo with a gh-pages branch so the HTML page can be viewed online (and you always want to make it easy on graders :-).
+
+##Course Project Prediction Quiz Portion
+Apply your machine learning algorithm to the 20 test cases available in the test data above and submit your predictions in appropriate format to the Course Project Prediction Quiz for automated grading.
+
+
+
+##Reference
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.

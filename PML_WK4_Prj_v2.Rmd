@@ -1,0 +1,235 @@
+---
+title: "How_well_they_excercise"
+author: "Fei Chen"
+date: "8/24/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+The objective of this analysis is to predict the manner in which the participants did excercise. The dataset is from Velloso et al. (2013). In the dataset, 6 participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions:
+
+- Class A: exactly according to the specification
+- Class B: throwing the elbows to the front
+- Class C: lifting the dumbbell only halfway
+- Class D: lowering the dumbbell only halfway
+- Class E: throwing the hips to the front
+
+In these 5 classes, class A corresponds to the specified execution of the exercise. The other 4 classes correspond to common mistakes. 
+
+## Objective
+The objective of this analysis is to predict the manner in which they did the exercise. 
+
+
+##Data description
+
+Read the training and testing datasets from the course website. The original source data comes from the following source: http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har.
+
+```{r}
+dt.tr <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv", stringsAsFactors = F)
+
+dt.tst <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv", stringsAsFactors = F)
+```
+
+
+```{r}
+dim(dt.tr)
+```
+
+The training set has 19622 observations and 160 variables. 
+
+```{r}
+dim(dt.tst)
+```
+
+The testing set has 20 observations and 160 variables.
+
+The response variable is "classe":
+
+```{r}
+unique(dt.tr$classe)
+```
+
+It has five categories: A, B, C, D, and E. They correspond to 5 different fashions in which participants performed in the study.
+
+```{r}
+library(ggplot2)
+ggplot(dt.tr, aes(classe)) + geom_bar()
+```
+
+The training data is quite balanced among the 5 categories, with category A more abundant than the other categories.
+
+The training dataset contains 159 variables that potentially can be used as predictors. It might be helpful to conduct exploratory analysis on these variables and select the ones that contain information to predict classe.
+
+## Exploratory Analysis 
+
+### Near Zero Variance predictor
+Predictors with zero variance do not contain information to explain the variance of response variable. Here we use the near zero variance function to identify near zero variance predictors. A variable is identified as near zero variance predictor when:
+
+ * 1. the percentage of unique values is less than 20% and
+
+ * 2. the ratio of the most frequent to the second most frequent value is greater than 20.
+
+
+```{r}
+library(lattice)
+library(caret)
+nsv <- nearZeroVar(dt.tr, saveMetrics = TRUE)
+```
+
+```{r}
+var.sel <- rownames(nsv)[nsv$nzv == FALSE]
+dt.tr2 <- dt.tr[, var.sel]
+```
+
+This step removes 60 near zero variance predictors.
+
+
+It is also obvious the first variable X is row index. We shall remove this variable as well.
+
+```{r}
+dt.tr3 <- dt.tr2[, -1]
+```
+
+
+There are six users in the dataset:
+
+```{r}
+unique(dt.tr3$user_name)
+```
+
+```{r}
+table(dt.tr3$classe, dt.tr3$user_name)
+```
+
+There are some timestamp columns in the dataset. 
+
+```{r}
+dt.tr3$raw_timestamp_part_1 <- format(as.POSIXct(dt.tr3$raw_timestamp_part_1, origin = "1970-01-01", tz = ""))
+dt.tr3$raw_timestamp_part_2 <-format(as.POSIXct(dt.tr3$raw_timestamp_part_2, origin = "1970-01-01", tz = ""), "%H:%M:%S")
+```
+
+```{r}
+dt.tr3[1,c(1:3)]
+```
+
+To make it simple, we remove the time data in the dataset.
+
+```{r}
+dt.tr4 <- dt.tr3[,c(7:ncol(dt.tr3))]
+```
+
+Also there are some columns that most of the observations are missing, this step removes the columns that have more than half of NAs
+
+```{r}
+dt.tr5 <- dt.tr4[,colSums(is.na(dt.tr4))/nrow(dt.tr4)<0.5]
+```
+
+Some variables are highly correlated. Here we identify the highly correlated variables.
+
+```{r}
+descrCorr <- cor(dt.tr5[,c(-ncol(dt.tr5))])
+```
+
+```{r}
+highCorr <- findCorrelation(descrCorr, 0.90)
+dt.tr6 <- dt.tr5[,-highCorr]
+
+ncol(dt.tr6)
+```
+
+Remove the variables that have correlation greater than 90%. 
+
+## Model training
+
+To evaluate the performance of algorithm, the training data is further split to training and validation sets. Model is trained using training dataset, and model is evaluated using testing set.
+
+```{r}
+set.seed(1)
+dt.tr6$classe <- as.factor(dt.tr6$classe)
+inTrain <- createDataPartition(dt.tr6$classe, p = 3/4, list = FALSE)
+training <- dt.tr6[inTrain,]
+testing <- dt.tr6[-inTrain,]
+```
+
+Distribution of response variable classe are similar in the training and testing datasets.
+
+```{r}
+prop.table(table(training$classe))
+```
+
+```{r}
+prop.table(table(dt.tr6$classe))
+```
+
+A simple way to build a model is use random forest algorithm. To speed up the training step, parallel computing is used with a cluster of 5 cpus.
+
+```{r}
+library(doParallel)
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
+modfit <- train(classe ~ ., data = training, method = "rf")
+stopCluster(cl)
+```
+
+
+Prediction is done on the testing dataset for validation.
+
+```{r}
+pred <- predict(modfit, testing)
+
+```
+
+```{r}
+testing$pred <- pred
+```
+
+```{r}
+confusionMatrix(testing$pred, testing$classe)
+```
+
+The confusion matrix shows the model has 0.995 of accuracy, 0.9938 of Kappa value.
+
+## Prediction
+
+The predict classe for the dt.tst dataset, training is done using the all the observations of dt.tr as training set.
+
+```{r}
+cl <- makePSOCKcluster(5)
+registerDoParallel(cl)
+modfit2 <- train(classe ~ ., data = dt.tr6, method = "rf")
+stopCluster(cl)
+```
+
+
+Subset the testing data frame with the same columns training set except response variable "classe".
+
+```{r}
+col.sel <- names(dt.tr6)[-46]
+col.sel <- c(col.sel, "problem_id")
+dt.tst2 <- dt.tst[,col.sel]
+```
+
+
+```{r}
+pred2 <- predict(modfit2, dt.tst2)
+dt.tst2$pred <- as.character(pred2)
+```
+
+
+```{r}
+dt.tst2[, c("problem_id", "pred")]
+```
+
+Predicted values are shown as above.
+
+
+
+##Reference
+Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, H. Qualitative Activity Recognition of Weight Lifting Exercises. Proceedings of 4th International Conference in Cooperation with SIGCHI (Augmented Human '13) . Stuttgart, Germany: ACM SIGCHI, 2013.
+
+http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har
