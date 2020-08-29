@@ -9,6 +9,9 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+Link to github repo: 
+https://github.com/feichen321/coursera_practicalmachinelearning.git
+
 ## Introduction
 
 The objective of this analysis is to predict the manner in which the participants did excercise. The dataset is from Velloso et al. (2013). In the dataset, 6 participants were asked to perform one set of 10 repetitions of the Unilateral Dumbbell Biceps Curl in five different fashions:
